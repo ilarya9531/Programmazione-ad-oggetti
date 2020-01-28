@@ -1,0 +1,24 @@
+#ifndef EROI
+#define EROI
+class Eroi{
+private:
+    unsigned int temporig;
+    unsigned int livellomax;
+public:
+    Eroi(QString = QString("Default"),
+            unsigned int = 0,
+            QString = QString("Default"),
+            unsigned int = 0,
+            unsigned int = 0,
+            unsigned int=0,
+            QString = QString("Default"),
+            QString = QString("Default"),
+            QString = QString("Default"),
+            unsigned int =0,
+            unsigned int=0,);
+    unsigned int getTempoRig()const;
+    unsigned int getLivelloMax()const;
+};
+
+#endif // EROI
+

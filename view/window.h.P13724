@@ -1,0 +1,110 @@
+#ifndef Window_H
+#define Window_H
+
+#include <model/exception.h>
+#include <model/deepptr.h>
+#include <model/container.h>
+#include <model/personaggio.h>
+#include <model/attacco.h>
+#include <model/difesa.h>
+#include <model/eroe.h>
+
+
+#include <QByteArray>
+
+#include <QComboBox>
+#include <QFile>
+#include <QFileDialog>
+#include <QFormLayout>
+#include <QFrame>
+#include <QGridLayout>
+#include <QGroupBox>
+#include <QHBoxLayout>
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QJsonValue>
+#include <QLabel>
+#include <QLineEdit>
+#include <QListWidget>
+#include <QPushButton>
+#include <QScrollArea>
+#include <QSpinBox>
+#include <QStackedWidget>
+#include <QString>
+#include <QVBoxLayout>
+#include <QPointer>
+class Window: public QWidget {
+    Q_OBJECT
+
+    private:
+        static QSize dimButton;
+        static unsigned int defaultWidth;
+        static unsigned int persGroupWidth;
+
+        Container<DeepPtr<Personaggio> > pers;
+
+        QComboBox* nomeComboBox;
+        QComboBox* descrComboBox;
+        QComboBox* dannoComboBox;
+        QComboBox* bersaglioPrefeComboBox;
+        QComboBox* costoComboBox;
+        QComboBox* vitaComboBox;
+        QComboBox* tempoComboBox;
+        QComboBox* tipoDannoComboBox;
+        QComboBox* bersagliComboBox;
+        QComboBox* distanzaComboBox;
+
+
+
+        QLabel* persID;
+        //QLabel* cardType;
+        QLabel* primaSpecialLabel;
+        QLabel* secondaSpecialLabel;
+        QLabel* terzaSpecialLabel;
+        QLabel* quartaSpecialLabel;
+        QLabel* quintaSpecialLabel;
+
+
+        QLineEdit* textBox;
+
+        QPushButton* nuovoPersButton;
+        QPushButton* cancPersButton;
+        QPushButton* modificaPersButton;
+
+        QStackedWidget* nomeStacked;
+        QStackedWidget* descrStacked;
+        QStackedWidget* dannoStacked;
+        QStackedWidget* bersaglioPrefeStacked;
+        QStackedWidget* costoStacked;
+        QStackedWidget* vitaStacked;
+        QStackedWidget* tempoStacked;
+        QStackedWidget* tipoDannoStacked;
+        QStackedWidget* bersagliStacked;
+        QStackedWidget* primaSpecialStacked;
+        QStackedWidget* secondaSpecialStacked;
+        QStackedWidget* terzaSpecialStacked;
+        QStackedWidget* quartaSpecialStacked;
+        QStackedWidget* quintaSpecialStacked;
+
+
+
+        static QString getType(DeepPtr<Card>);
+
+    private slots:
+        void filtraPers(QListWidget*, QLabel*);
+        bool leggiDaFile(QString, QListWidget*, QLabel*);
+        void resetFilters() const;
+        void setButton(bool, bool, bool) const;
+        void setStackedVisible(bool, bool, bool) const;
+        void updatePers(QString);
+        void updateComboBox();
+        void updateStacked() const;
+        void updateViewer(QString);
+
+    public:
+        Window(QWidget *parent = 0);
+
+};
+
+#endif // Window_H

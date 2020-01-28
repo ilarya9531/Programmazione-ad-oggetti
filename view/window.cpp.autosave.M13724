@@ -1,0 +1,1105 @@
+#include <view/window.h>
+
+using std::sort;
+
+QSize Window::dimButton = QSize(50, 50);
+unsigned int Window::defaultWidth = 300;
+unsigned int Window::persGroupWidth = 500;
+
+
+//method to filter the displayed cards based on the filters values
+/*void Window::filtraPers(QListWidget* currentList, QLabel* persTrovati) {
+    currentList->reset();
+    currentList->clear();
+    for(auto it = pers.begin(); it != pers.end(); ++it) {
+        if( (!artistComboBox->currentIndex()      || (*it)->getArtist() == artistComboBox->currentText()) &&
+            (!attackComboBox->currentIndex()      || (getType(*it) == "Minion" && QString::number(static_cast<Minion*>((*it).pointer)->getAttack()) == attackComboBox->currentText())
+                                                  || (getType(*it) == "Weapon" && QString::number(static_cast<Weapon*>((*it).pointer)->getAttack()) == attackComboBox->currentText())) &&
+            (!collectibleComboBox->currentIndex() || (*it)->getCollectible() == collectibleComboBox->currentText()) &&
+            (!classComboBox->currentIndex()       || (*it)->getClassName() == classComboBox->currentText()) &&
+            (!costComboBox->currentIndex()        || QString::number((*it)->getCost()) == costComboBox->currentText()) &&
+            (!healthComboBox->currentIndex()      || (getType(*it) == "Hero" && QString::number(static_cast<Hero*>((*it).pointer)->getArmor()) == healthComboBox->currentText())
+                                                  || (getType(*it) == "Minion" && QString::number(static_cast<Minion*>((*it).pointer)->getHealth()) == healthComboBox->currentText())
+                                                  || (getType(*it) == "Weapon" && QString::number(static_cast<Weapon*>((*it).pointer)->getDurability()) == healthComboBox->currentText())) &&
+            (!rarityComboBox->currentIndex()      || (*it)->getRarity() == rarityComboBox->currentText()) &&
+            (!setComboBox->currentIndex()         || (*it)->getSet() == setComboBox->currentText()) &&
+            (textBox->text().isEmpty()            || (*it)->getName().toUpper().contains(textBox->text().toUpper())) &&
+            (!tribeComboBox->currentIndex()       || (getType(*it) == "Minion" && static_cast<Minion*>((*it).pointer)->getTribe() == tribeComboBox->currentText())) &&
+            (!typeComboBox->currentIndex()        || ((typeComboBox->currentText() == getType(*it))))) {
+            QListWidgetItem* toAdd = new QListWidgetItem();
+            toAdd->setData(Qt::UserRole, (*it)->getId());
+            toAdd->setText((*it)->getName());
+            currentList->addItem(toAdd);
+        }
+    }
+    currentList->sortItems();
+    persTrovati->setText(QString::number(currentList->count())+" card(s) found!");
+}*/
+//ritorna un QString che contiene il tipo del personaggio, trovato tramita cast sul parametro passato
+
+QString Window::getType(DeepPtr<Personaggio> pers) {
+    if(dynamic_cast<Attacco*>(pers.pointer)) {
+        return "Attacco";
+    }
+    if(dynamic_cast<Difesa*>(pers.pointer)) {
+        return "Minion";
+    }
+    if(dynamic_cast<Eroe*>(pers.pointer)) {
+        return "Eroe";
+    }
+   
+    throw typeError("Tipo personaggio non trovato");
+}
+
+
+//legge oi dati dal file la cui posizione si trova nella variabile locale "filePath"
+
+bool Window::leggiDaFile(QString filePath, QListWidget* currentList, QLabel* persTrovati) {
+    QFile file(filePath);
+    file.open(QIODevice::ReadOnly);
+    QByteArray jsonData = file.readAll();
+    file.close();
+    QJsonDocument document = QJsonDocument::fromJson(jsonData);
+    QJsonArray array = document.object().value("pers").toArray();
+
+    if(!array.isEmpty()) {
+        if(!pers.isEmpty()) {
+            pers.clear();
+        }
+        
+        foreach(const QJsonValue& v, array) {
+            QString tipoPers = QString(v.toObject().value("type").toString());
+            if(tipoPers == "Attacco") {
+                pers.add(new Attacco(v.toObject().value("nome").toString(),
+                                   v.toObject().value("descrizione").toString(),
+                                   v.toObject().value("danno").toString(),
+                                   v.toObject().value("bersaglioprefe").toInt(),
+                                   v.toObject().value("costo").toInt(),
+                                   v.toObject().value("vita").toString(),
+                                   v.toObject().value("tempo").toString(),
+                                   v.toObject().value("tipodanno").toString(),
+                                   v.toObject().value("bersagli").toString(),
+                                   v.toObject().value("id").toString(),
+                                   v.toObject().value("spazio").toString(),
+                                   v.toObject().value("velocita").toInt()
+                                  ));
+            }
+            else if(cardType == "Difesa") {
+                pers.add(new Difesa(v.toObject().value("nome").toString(),
+                                     v.toObject().value("descrizione").toString(),
+                                     v.toObject().value("danno").toString(),
+                                     v.toObject().value("bersaglioprefe").toInt(),
+                                     v.toObject().value("costo").toInt(),
+                                     v.toObject().value("vita").toString(),
+                                     v.toObject().value("tempo").toString(),
+                                     v.toObject().value("tipodanno").toString(),
+                                     v.toObject().value("bersagli").toString(),
+                                     v.toObject().value("id").toString(),
+                                     v.toObject().value("distanza").toString()
+                                     
+                                    ));
+          }
+            else if(cardType == "Eroe") {
+                pers.add(new Eroe(v.toObject().value("nome").toString(),
+                                    v.toObject().value("descrizione").toString(),
+                                    v.toObject().value("danno").toString(),
+                                    v.toObject().value("bersaglioprefe").toInt(),
+                                    v.toObject().value("costo").toInt(),
+                                    v.toObject().value("vita").toString(),
+                                    v.toObject().value("tempo").toString(),
+                                    v.toObject().value("tipodanno").toString(),
+                                    v.toObject().value("bersagli").toString(),
+                                    v.toObject().value("id").toString(),
+                                    v.toObject().value("livellomax").toString(),
+                                    v.toObject().value("temporig").toString()
+                                   ));
+            }
+            
+        }
+        updateComboBox();
+        filtraPers(currentList, persTrovati);
+        return true;
+    }
+    return false;
+}
+//metodo che setta tutte le ComboBox di default come "all" 
+
+void Window::resetFilters() const {
+    artistComboBox->setCurrentIndex(0);
+    attackComboBox->setCurrentIndex(0);
+    classComboBox->setCurrentIndex(0);
+    collectibleComboBox->setCurrentIndex(0);
+    costComboBox->setCurrentIndex(0);
+    healthComboBox->setCurrentIndex(0);
+    rarityComboBox->setCurrentIndex(0);
+    setComboBox->setCurrentIndex(0);
+    tribeComboBox->setCurrentIndex(0);
+    typeComboBox->setCurrentIndex(0);
+    textBox->clear();
+}
+// metodo per settare i 3 pulsanti
+void Window::setButton(bool nuovoB, bool canc, bool mod) const {
+    if(nuovoPersButton->isEnabled() != nuovoB) {
+        nuovoPersButton->setEnabled(nuovoB);
+    }
+    if(cancPersButton->isEnabled() != cancB) {
+        cancPersButton->setEnabled(cancB);
+    }
+    if(modificaPersButton->isEnabled() != modB) {
+        editCardButton->setEnabled(modB);
+    }
+}
+//metodo che serve per impostare i campi facoltativi (appartenenti solo ad alcuni personaggi) visibili o meno
+
+void Window::setStackedVisible(bool primo, bool secondo, bool terzo, bool quarto, bool quinto) const {
+    if(primaSpecialLabel->isVisible() != primo) {
+        primaSpecialLabel->setVisible(primo);
+        primaSpecialLabel->setVisible(primo);
+    }
+    if(secondaSpecialLabel->isVisible() != secondo) {
+        secondaSpecialLabel->setVisible(secondo);
+        secondaSpecialLabel->setVisible(secondo);
+    }
+    if(terzaSpecialLabel->isVisible() != terzo) {
+        terzaSpecialLabel->setVisible(terzo);
+        terzaSpecialLabel->setVisible(terzo);
+    }
+}
+//metodo utilizzato per modificare i dati di un personaggio già inserito
+void Window::updateCard(QString ogg) {
+    for(auto it = pers.begin(); it != pers.end(); ++it) {
+        if( (*it)->getId() == ogg) {
+   
+            (*it)->setNome(static_cast<QLineEdit*>(nomeStacked->widget(1))->text());
+            (*it)->setDescrizone(static_cast<QLineEdit*>(descrStacked->widget(1))->text());
+            (*it)->setCost(static_cast<QSpinBox*>(dannoStacked->widget(1))->value());
+            (*it)->setBersaglioPrefe(static_cast<QComboBox*>(bersaglioPrefeStacked->widget(1))->currentText());
+            (*it)->setCosto(static_cast<QSpinBox*>(costoStacked->widget(1))->value());
+            (*it)->setVita(static_cast<QSpinBox*>(vitaStacked->widget(1))->value());
+            (*it)->setTempo(static_cast<QSpinBox*>(tempoStacked->widget(1))->value());
+            (*it)->setTipoDanno(static_cast<QComboBox*>(tipoDannoStacked->widget(1))->currentText());
+            (*it)->setBersagli(static_cast<QComboBox*>(bersagliStacked->widget(1))->currentText());
+            
+            if(getType(*it) == "Difesa") {
+                static_cast<Difesa*>((*it).pointer)->set(static_cast<QSpinBox*>(primaSpecialStacked->widget(1))->value());
+            }
+            else if(getType(*it) == "Attacco") {
+                Attacco* att = static_cast<Attacco*>((*it).pointer);
+                att->setSpazio(static_cast<QSpinBox*>(secondaSpecialStacked->widget(1))->value());
+                att->setVelocita(static_cast<QSpinBox*>(terzaSpecialStacked->widget(1))->value());
+                
+            }
+            else if(getType(*it) == "Eroe") {
+                Eroe* er = static_cast<Eroe*>((*it).pointer);
+                er->setLivelloMax(static_cast<QSpinBox*>(quartaSpecialStacked->widget(1))->value());
+                er->setTempoRig(static_cast<QSpinBox*>(quintaSpecialStacked->widget(1))->value());
+            }
+            return;
+        }
+    }
+}
+//metodo per visualizzare i dati realtivi al personaggio scelto
+void Window::updateComboBox() {
+    //tutti i personaggi
+    Container<QString> valNome;
+    Container<QString> valDescr;
+    Container<int> valDanno;
+    Container<QString> valBersaglioPrefe;
+    Container<int> valCosto;
+    Container<int> valVita;
+    Container<int> valTempo;
+    Container<QString> valTipoDanno;
+    Container<QString> valBersagli;
+    Container<QString> typeValues;
+    
+    //difesa
+    Container<int> valDistanza;
+    
+    //attacco
+    Container<int> valVelocita;
+    Container<int> valSpazio;
+    
+    //eroe
+    Container<QString> valTempoRig;
+    Container<QString> valLivelloMax;
+    
+
+    for(auto it = pers.begin(); it != pers.end(); ++it) {
+        if(valNome.search((*it)->getNome()) == -1) {
+            valNome.add((*it)->getNome());
+        }
+        if(valDecsr.search((*it)->getDescr()) == -1) {
+            valDescr.add((*it)->getDescr());
+        }
+        if(valDanno.search((*it)->getDanno()) == -1) {
+            valDanno.add((*it)->getDanno());
+        }
+        if(valBersaglioPrefe.search((*it)->getBersaglioPrefe()) == -1) {
+            valBersaglioPrefe.add((*it)->getBersaglioPrefe());
+        }
+        if(valCosto.search((*it)->getCosto()) == -1) {
+            valCosto.add((*it)->getCosto());
+        }
+        if(valVita.search((*it)->getVita()) == -1) {
+            valVita.add((*it)->getVita());
+        }
+        if(valTempo.search((*it)->getTempo()) == -1) {
+            valTempo.add((*it)->getTempo());
+        }
+        if(valTipoDanno.search((*it)->getTipoDanno()) == -1) {
+            valTipoDanno.add((*it)->getTipoDanno());
+        }
+        if(valBersagli.search((*it)->getBersagli()) == -1) {
+            valBersagli.add((*it)->getBersagli());
+        }
+        if(getType(*it) == "Difesa") {
+            if(valDistanza.search(static_cast<Difesa*>((*it).pointer)->getDistanza()) == -1) {
+                valDistanza.add(static_cast<Difesa*>((*it).pointer)->getDistanza());
+            }
+        }
+        if(getType(*it) == "Attacco") {
+            Attacco* att = static_cast<Attacco*>((*it).pointer);
+            if(valSpazio.search(att->getSpazio()) == -1) {
+                valSpazio.add(att->getSpazio());
+            }
+            if(valVelocita.search(att->getVelocita()) == -1) {
+                valVelocita.add(att->getVelocita());
+            }
+            
+        }
+        if(getType(*it) == "Eroe") {
+            Eroe* er = static_cast<Eroe*>((*it).pointer);
+            if(valTempoRig.search(er->getTempoRig()) == -1) {
+                valTempoRig.add(er->getTempoRig());
+            }
+            if(valLivelloMax.search(er->getLivelloMax()) == -1) {
+                valLivelloMax.add(er->getLivelloMax());
+            }
+        }
+        if(typeValues.search(getType(*it)) == -1) {
+            typeValues.add(getType(*it));
+        }
+    }
+    sort(valNome.begin(), valNome.end());
+    nomeComboBox->clear();
+    nomeComboBox->addItem("All");
+    for(auto it = valNome.begin(); it != valNome.end(); ++it) {
+        if(!(*it).isEmpty()) {
+            nomeComboBox->addItem(*it);
+        }
+    }
+
+    sort(valDescr.begin(), valDescr.end());
+    descrComboBox->clear();
+    descrComboBox->addItem("All");
+    for(auto it = valDescr.begin(); it != valDescr.end(); ++it) {
+        descrComboBox->addItem(QString::number(*it));
+    }
+
+    sort(valDanno.begin(), valDanno.end());
+    dannoComboBox->clear();
+    dannoComboBox->addItem("All");
+    for(auto it = valDanno.begin(); it != valDanno.end(); ++it) {
+        
+            dannoComboBox->addItem(QString::number(*it));
+        
+    }
+
+    sort(valBersaglioPrefe.begin(), valBersaglioPrefe.end());
+    bersaglioPrefeComboBox->clear();
+    bersaglioPrefeComboBox->addItem("All");
+    for(auto it = valBersaglioPrefe.begin(); it != valBersaglioPrefe.end(); ++it) {
+        if(!(*it).isEmpty()) {
+            bersaglioPrefeComboBox->addItem(*it);
+        }
+    }
+
+    sort(valCosto.begin(), valCosto.end());
+    costoComboBox->clear();
+    costoComboBox->addItem("All");
+    for(auto it = valCosto.begin(); it != valCosto.end(); ++it) {
+        costoComboBox->addItem(QString::number(*it));
+    }
+
+    sort(valVita.begin(), valVita.end());
+    vitaComboBox->clear();
+    vitaComboBox->addItem("All");
+    for(auto it = valVita.begin(); it != valVita.end(); ++it) {
+        vitaComboBox->addItem(QString::number(*it));
+    }
+
+    sort(valTempo.begin(), valTempo.end());
+    tempoComboBox->clear();
+    tempoComboBox->addItem("All");
+    for(auto it = valTempo.begin(); it != valTempo.end(); ++it) {
+        
+            tempoComboBox->addItem(QString::number(*it));
+        
+    }
+
+    sort(valTipoDanno.begin(), valTipoDanno.end());
+    tipoDannoComboBox->clear();
+    tipoDannoComboBox->addItem("All");
+    for(auto it = valTipoDanno.begin(); it != valTipoDanno.end(); ++it) {
+        if(!(*it).isEmpty()) {
+            tipoDannoComboBox->addItem(*it);
+        }
+    }
+
+    sort(valBersagli.begin(), valBersagli.end());
+    bersagliComboBox->clear();
+    bersagliComboBox->addItem("All");
+    for(auto it = valBersagli.begin(); it != valBersagli.end(); ++it) {
+        if(!(*it).isEmpty()) {
+            bersagliComboBox->addItem(*it);
+        }
+    }
+
+    
+}
+
+//change the stacked index to the opposite of the current state
+void Window::updateStacked() const {
+    nomeStacked->setCurrentIndex(!nomeStacked->currentIndex());
+    descrStacked->setCurrentIndex(!descrStacked->currentIndex());
+    dannoStacked->setCurrentIndex(!dannoStacked->currentIndex());
+    bersaglioPrefeStacked->setCurrentIndex(!bersaglioPrefeStacked->currentIndex());
+    costoStacked->setCurrentIndex(!costoStacked->currentIndex());
+    vitaStacked->setCurrentIndex(!vitaStacked->currentIndex());
+    tempoStacked->setCurrentIndex(!tempoStacked->currentIndex());
+    tipoDannoStacked->setCurrentIndex(!tipoDannoStacked->currentIndex());
+    bersagliStacked->setCurrentIndex(!bersagliStacked->currentIndex());
+    primaSpecialStacked->setCurrentIndex(!primaSpecialStacked->currentIndex());
+    secondaSpecialStacked->setCurrentIndex(!secondaSpecialStacked->currentIndex());
+    terzaSpecialStacked->setCurrentIndex(!terzaSpecialStacked->currentIndex());
+    quartaSpecialStacked->setCurrentIndex(!quartaSpecialStacked->currentIndex());
+    quintaSpecialStacked->setCurrentIndex(!quintaSpecialStacked->currentIndex());
+    
+}
+
+//method to update the card viewer "zone" by using the passed parameter as cardID value or to check the action type
+void Window::updateViewer(QString currentItem) {
+    if(currentItem == "deleted") {
+        static_cast<QLabel*>(artistStacked->widget(0))->clear();
+        static_cast<QLineEdit*>(artistStacked->widget(1))->clear();
+        static_cast<QLabel*>(classStacked->widget(0))->clear();
+        static_cast<QLineEdit*>(classStacked->widget(1))->clear();
+        static_cast<QLabel*>(collectibleStacked->widget(0))->clear();
+        static_cast<QLabel*>(costStacked->widget(0))->clear();
+        static_cast<QSpinBox*>(costStacked->widget(1))->setValue(0);
+        static_cast<QLabel*>(flavorStacked->widget(0))->clear();
+        static_cast<QLineEdit*>(flavorStacked->widget(1))->clear();
+        static_cast<QLabel*>(nameStacked->widget(0))->clear();
+        static_cast<QLineEdit*>(nameStacked->widget(1))->clear();
+        static_cast<QLabel*>(rarityStacked->widget(0))->clear();
+        static_cast<QLineEdit*>(rarityStacked->widget(1))->clear();
+        static_cast<QLabel*>(setStacked->widget(0))->clear();
+        static_cast<QLineEdit*>(setStacked->widget(1))->clear();
+        static_cast<QLabel*>(textStacked->widget(0))->clear();
+        static_cast<QLineEdit*>(textStacked->widget(1))->clear();
+        static_cast<QLabel*>(firstSpecialStacked->widget(0))->clear();
+        static_cast<QSpinBox*>(firstSpecialStacked->widget(1))->setValue(0);
+        static_cast<QLabel*>(secondSpecialStacked->widget(0))->clear();
+        static_cast<QSpinBox*>(secondSpecialStacked->widget(1))->setValue(0);
+        static_cast<QLabel*>(thirdSpecialStacked->widget(0))->clear();
+        static_cast<QLineEdit*>(thirdSpecialStacked->widget(1))->clear();
+        cardID->clear();
+        cardType->clear();
+    }
+    else {
+        for(auto it = pers.begin(); it != pers.end(); ++it) {
+            if((*it)->getId() == currentItem) {
+                static_cast<QLabel*>(artistStacked->widget(0))->setText((*it)->getArtist());
+                static_cast<QLineEdit*>(artistStacked->widget(1))->setText((*it)->getArtist());
+                static_cast<QLabel*>(classStacked->widget(0))->setText((*it)->getClassName());
+                static_cast<QLineEdit*>(classStacked->widget(1))->setText((*it)->getClassName());
+                static_cast<QLabel*>(costStacked->widget(0))->setText(QString::number((*it)->getCost()));
+                static_cast<QSpinBox*>(costStacked->widget(1))->setValue((*it)->getCost());
+                static_cast<QLabel*>(collectibleStacked->widget(0))->setText((*it)->getCollectible());
+                if((*it)->getCollectible() == "False") {
+                    static_cast<QComboBox*>(collectibleStacked->widget(1))->setCurrentIndex(0);
+                }
+                else {
+                    static_cast<QComboBox*>(collectibleStacked->widget(1))->setCurrentIndex(1);
+                }
+                static_cast<QLabel*>(flavorStacked->widget(0))->setText((*it)->getFlavor());
+                static_cast<QLineEdit*>(flavorStacked->widget(1))->setText((*it)->getFlavor());
+                static_cast<QLabel*>(nameStacked->widget(0))->setText((*it)->getName());
+                static_cast<QLineEdit*>(nameStacked->widget(1))->setText((*it)->getName());
+                static_cast<QLabel*>(rarityStacked->widget(0))->setText((*it)->getRarity());
+                static_cast<QLineEdit*>(rarityStacked->widget(1))->setText((*it)->getRarity());
+                static_cast<QLabel*>(setStacked->widget(0))->setText((*it)->getSet());
+                static_cast<QLineEdit*>(setStacked->widget(1))->setText((*it)->getSet());
+                static_cast<QLabel*>(textStacked->widget(0))->setText((*it)->getText());
+                static_cast<QLineEdit*>(textStacked->widget(1))->setText((*it)->getText());
+                cardType->setText(getType(*it));
+                if(cardType->text() == "Hero") {
+                    Hero* toHero = static_cast<Hero*>((*it).pointer);
+                    firstSpecialLabel->setText("<b>Armor:<b/>");
+                    static_cast<QLabel*>(firstSpecialStacked->widget(0))->setText(QString::number(toHero->getArmor()));
+                    static_cast<QSpinBox*>(firstSpecialStacked->widget(1))->setValue(toHero->getArmor());
+                    setStackedVisible(true, false, false);
+                }
+                else if(cardType->text() == "Minion") {
+                    Minion* toMinion = static_cast<Minion*>((*it).pointer);
+                    firstSpecialLabel->setText("<b>Attack:<b/>");
+                    secondSpecialLabel->setText("<b>Health:<b/>");
+                    thirdSpecialLabel->setText("<b>Tribe:<b/>");
+                    static_cast<QLabel*>(firstSpecialStacked->widget(0))->setText(QString::number(toMinion->getAttack()));
+                    static_cast<QSpinBox*>(firstSpecialStacked->widget(1))->setValue(toMinion->getAttack());
+                    static_cast<QLabel*>(secondSpecialStacked->widget(0))->setText(QString::number(toMinion->getHealth()));
+                    static_cast<QSpinBox*>(secondSpecialStacked->widget(1))->setValue(toMinion->getHealth());
+                    static_cast<QLabel*>(thirdSpecialStacked->widget(0))->setText(toMinion->getTribe());
+                    static_cast<QLineEdit*>(thirdSpecialStacked->widget(1))->setText(toMinion->getTribe());
+                    setStackedVisible(true, true, true);
+                }
+                else if(cardType->text() == "Spell") {
+                    setStackedVisible(false, false, false);
+                }
+                else {
+                    Weapon* toWeapon = static_cast<Weapon*>((*it).pointer);
+                    firstSpecialLabel->setText("<b>Attack:<b/>");
+                    secondSpecialLabel->setText("<b>Durability:<b/>");
+                    static_cast<QLabel*>(firstSpecialStacked->widget(0))->setText(QString::number(toWeapon->getAttack()));
+                    static_cast<QSpinBox*>(firstSpecialStacked->widget(1))->setValue(toWeapon->getAttack());
+                    static_cast<QLabel*>(secondSpecialStacked->widget(0))->setText(QString::number(toWeapon->getDurability()));
+                    static_cast<QSpinBox*>(secondSpecialStacked->widget(1))->setValue(toWeapon->getDurability());
+                    setStackedVisible(true, true, false);
+                }
+                return;
+            }
+        }
+    }
+}
+
+//constructor
+Window::Window(QWidget *parent):
+    QWidget(parent),
+
+    nomeComboBox(new QComboBox()),
+    descrComboBox(new QComboBox()),
+    dannoComboBox(new QComboBox()),
+    bersaglioPrefeComboBox(new QComboBox()),
+    costoComboBox(new QComboBox()),
+    vitaComboBox(new QComboBox()),
+    tempoComboBox(new QComboBox()),
+    tipoDannoComboBox(new QComboBox()),
+    bersagliComboBox(new QComboBox()),
+
+    cardID(new QLabel()),
+    tipoPers(new QLabel()),
+    primaSpecialLabel(new QLabel()),
+    secondaSpecialLabel(new QLabel()),
+    terzaSpecialLabel(new QLabel()),
+    quartaSpecialLabel(new QLabel()),
+    quintaSpecialLabel(new QLabel()),
+
+    textBox(new QLineEdit()),
+
+
+    nuovoPersButton(new QPushButton("Nuovo\na Personaggio")),
+    cancPersButton(new QPushButton("Cancella\na Personaggio")),
+    modificaPersButton(new QPushButton("Modifica\na Personaggio")),
+    /*QString nome;
+    QString descrizione;
+    unsigned int danno;
+    QString bersaglioprefe;
+    unsigned int costo;
+    unsigned int vita;
+    unsigned int tempo;
+    QString tipodanno;
+    
+    QString bersagli;
+    QString id;*/
+
+    nomeStacked(new QStackedWidget()),
+    descrStacked(new QStackedWidget()),
+    dannoStacked(new QStackedWidget()),
+    bersaglioPrefeStacked(new QStackedWidget()),
+    costoStacked(new QStackedWidget()),
+    vitaStacked(new QStackedWidget()),
+    tempoStacked(new QStackedWidget()),
+    tipoDannoStacked(new QStackedWidget()),
+    bersagliStacked(new QStackedWidget()),
+    primaSpecialStacked(new QStackedWidget()),
+    secondaSpecialStacked(new QStackedWidget()),
+    terzaSpecialStacked(new QStackedWidget()),
+    quartaSpecialStacked(new QStackedWidget()),
+    quintaSpecialStacked(new QStackedWidget()) {
+
+    QListWidget* persList = new QListWidget();
+    QLabel* persTrovati = new QLabel();
+    //loadFromFile("../qontainer/default.json", cardsList, persTrovati); //uncomment the line to load a default file
+
+    QGroupBox* persGroup = new QGroupBox("Cerca Personaggio");
+    persGroup->setMinimum(persGroupWidth);
+
+    QHBoxLayout* ricercaPersLayout = new QHBoxLayout();
+    ricercaPersLayout->setSizeConstraint(QLayout::SetMinimumSize);
+
+    textBox->setMinimumWidth(defaultWidth);
+    QScrollArea* listScroll = new QScrollArea();
+    listScroll->setWidgetResizable(true);
+    listScroll->setVerticalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    listScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded);
+    listScroll->setMinimumWidth(defaultWidth);
+    QVBoxLayout* listVBox = new QVBoxLayout();
+    listVBox->addWidget(textBox);
+    listVBox->addWidget(listScroll);
+
+    QPushButton* clearButton = new QPushButton("Clear\nSelect");
+    clearButton->setMinimumSize(dimButton);
+    clearButton->setMaximumSize(dimButton);
+    clearButton->setEnabled(false);
+    persTrovati->setAlignment(Qt::AlignCenter);
+    QPushButton* resetButton = new QPushButton("Reset\nFilters");
+    resetButton->setMinimumSize(dimButton);
+    resetButton->setMaximumSize(dimButton);
+
+    QHBoxLayout* extraRow = new QHBoxLayout();
+    extraRow->addWidget(clearButton);
+    extraRow->addWidget(persTrovati);
+    extraRow->addWidget(resetButton);
+
+    artistComboBox->setMinimumWidth(defaultWidth);
+    attackComboBox->setMinimumWidth(defaultWidth);
+    classComboBox->setMinimumWidth(defaultWidth);
+    collectibleComboBox->setMinimumWidth(defaultWidth);
+    costComboBox->setMinimumWidth(defaultWidth);
+    healthComboBox->setMinimumWidth(defaultWidth);
+    rarityComboBox->setMinimumWidth(defaultWidth);
+    setComboBox->setMinimumWidth(defaultWidth);
+    tribeComboBox->setMinimumWidth(defaultWidth);
+    typeComboBox->setMinimumWidth(defaultWidth);
+
+    QFormLayout* filtersLayout = new QFormLayout();
+
+    filtersLayout->addRow("Class", classComboBox);
+    filtersLayout->addRow("Type", typeComboBox);
+    filtersLayout->addRow("Cost", costComboBox);
+    filtersLayout->addRow("Rarity", rarityComboBox);
+    filtersLayout->addRow("Set", setComboBox);
+    filtersLayout->addRow("Tribe", tribeComboBox);
+    filtersLayout->addRow("Attack", attackComboBox);
+    filtersLayout->addRow("Armor/Health/Durability", healthComboBox);
+    filtersLayout->addRow("Artist", artistComboBox);
+    filtersLayout->addRow("Collectible", collectibleComboBox);
+    filtersLayout->addItem(extraRow);
+
+    ricercaPersLayout->addLayout(listVBox);
+    ricercaPersLayout->addLayout(filtersLayout);
+    persGroup->setLayout(ricercaPersLayout);
+
+    filtraPers(persList, persTrovati);
+    listScroll->setWidget(persList);
+
+    QGroupBox* operationsGroup = new QGroupBox("Operations");
+
+    QFormLayout* operationsForm = new QFormLayout();
+    operationsForm->setSizeConstraint(QLayout::SetMinimumSize);
+
+    nuovoPersButton->setMinimumSize(dimButton);
+    nuovoPersButton->setMaximumSize(dimButton);
+
+    cancPersButton->setMinimumSize(dimButton);
+    cancPersButton->setMaximumSize(dimButton);
+    cancPersButton->setEnabled(false);
+
+    editCardButton->setMinimumSize(dimButton);
+    editCardButton->setMaximumSize(dimButton);
+    editCardButton->setEnabled(false);
+
+    QPushButton* helpButton = new QPushButton("Help");
+    helpButton->setMinimumSize(dimButton);
+    helpButton->setMaximumSize(dimButton);
+
+    QPushButton* saveButton = new QPushButton("Save");
+    saveButton->setMinimumSize(dimButton);
+    saveButton->setMaximumSize(dimButton);
+    saveButton->setToolTip("Save the current cards in a file");
+
+    QPushButton* loadButton = new QPushButton("Load");
+    loadButton->setMinimumSize(dimButton);
+    loadButton->setMaximumSize(dimButton);
+    loadButton->setToolTip("Replace the current cards with\nthe ones from another file");
+
+    QLabel* fileLabel = new QLabel();
+    fileLabel->setAlignment(Qt::AlignHCenter);
+    fileLabel->setWordWrap(true);
+
+    QFrame* horizontalSplit = new QFrame();
+    horizontalSplit->setFrameShape(QFrame::HLine);
+    horizontalSplit->setFrameShadow(QFrame::Raised);
+    horizontalSplit->setLineWidth(0);
+    horizontalSplit->setMidLineWidth(0);
+
+    operationsForm->addRow(nuovoPersButton, editCardButton);
+    operationsForm->addRow(cancPersButton);
+    operationsForm->addRow(horizontalSplit);
+    operationsForm->addRow(helpButton);
+    operationsForm->addRow(horizontalSplit);
+    operationsForm->addRow(saveButton, loadButton);
+    operationsForm->addRow(fileLabel);
+    operationsGroup->setLayout(operationsForm);
+
+    QGroupBox* cardViewerGroup = new QGroupBox("Card viewer");
+    cardViewerGroup->setMinimumWidth(defaultWidth);
+
+    QLabel* artistLabel = new QLabel();
+    artistLabel->setAlignment(Qt::AlignVCenter);
+    artistLabel->setWordWrap(true);
+    QLineEdit* artistLineEdit = new QLineEdit();
+    artistStacked->addWidget(artistLabel);
+    artistStacked->addWidget(artistLineEdit);
+
+    cardType->setAlignment(Qt::AlignVCenter);
+    cardType->setWordWrap(true);
+
+    QLabel* classLabel = new QLabel();
+    classLabel->setAlignment(Qt::AlignVCenter);
+    classLabel->setWordWrap(true);
+    QLineEdit* classLineEdit = new QLineEdit();
+    classStacked->addWidget(classLabel);
+    classStacked->addWidget(classLineEdit);
+
+    QLabel* collectibleLabel = new QLabel();
+    collectibleLabel->setAlignment(Qt::AlignVCenter);
+    collectibleLabel->setWordWrap(true);
+    QComboBox* collectibleComboBoxEdit = new QComboBox();
+    collectibleComboBoxEdit->addItem("False");
+    collectibleComboBoxEdit->addItem("True");
+    collectibleStacked->addWidget(collectibleLabel);
+    collectibleStacked->addWidget(collectibleComboBoxEdit);
+
+    QLabel* costLabel = new QLabel();
+    costLabel->setAlignment(Qt::AlignVCenter);
+    costLabel->setWordWrap(true);
+    QSpinBox* costSpinBox = new QSpinBox();
+    costSpinBox->setMaximum(999);
+    costSpinBox->setSingleStep(1);
+    costStacked->addWidget(costLabel);
+    costStacked->addWidget(costSpinBox);
+
+    QLabel* firstLabel = new QLabel();
+    firstLabel->setAlignment(Qt::AlignVCenter);
+    firstLabel->setWordWrap(true);
+    QSpinBox* firstSpecialSpinBox = new QSpinBox();
+    firstSpecialSpinBox->setMaximum(999);
+    firstSpecialSpinBox->setSingleStep(1);
+    firstSpecialStacked->addWidget(firstLabel);
+    firstSpecialStacked->addWidget(firstSpecialSpinBox);
+
+    QLabel* flavorLabel = new QLabel();
+    flavorLabel->setAlignment(Qt::AlignVCenter);
+    flavorLabel->setWordWrap(true);
+    QLineEdit* flavorLineEdit = new QLineEdit();
+    flavorStacked->addWidget(flavorLabel);
+    flavorStacked->addWidget(flavorLineEdit);
+
+    QLabel* nameLabel = new QLabel();
+    nameLabel->setAlignment(Qt::AlignVCenter);
+    nameLabel->setWordWrap(true);
+    QLineEdit* nameLineEdit = new QLineEdit();
+    nameStacked->addWidget(nameLabel);
+    nameStacked->addWidget(nameLineEdit);
+
+    QLabel* rarityLabel = new QLabel();
+    rarityLabel->setAlignment(Qt::AlignVCenter);
+    rarityLabel->setWordWrap(true);
+    QLineEdit* rarityLineEdit = new QLineEdit();
+    rarityStacked->addWidget(rarityLabel);
+    rarityStacked->addWidget(rarityLineEdit);
+
+    QLabel* secondLabel = new QLabel();
+    secondLabel->setAlignment(Qt::AlignVCenter);
+    secondLabel->setWordWrap(true);
+    QSpinBox* secondSpecialSpinBox = new QSpinBox();
+    secondSpecialSpinBox->setMaximum(999);
+    secondSpecialSpinBox->setSingleStep(1);
+    secondSpecialStacked->addWidget(secondLabel);
+    secondSpecialStacked->addWidget(secondSpecialSpinBox);
+
+    QLabel* setLabel = new QLabel();
+    setLabel->setAlignment(Qt::AlignVCenter);
+    setLabel->setWordWrap(true);
+    QLineEdit* setLineEdit = new QLineEdit();
+    setStacked->addWidget(setLabel);
+    setStacked->addWidget(setLineEdit);
+
+    QLabel* textLabel = new QLabel();
+    textLabel->setAlignment(Qt::AlignVCenter);
+    textLabel->setWordWrap(true);
+    QLineEdit* textLineEdit = new QLineEdit();
+    textStacked->addWidget(textLabel);
+    textStacked->addWidget(textLineEdit);
+
+    QLabel* thirdLabel = new QLabel();
+    thirdLabel->setAlignment(Qt::AlignVCenter);
+    thirdLabel->setWordWrap(true);
+    QLineEdit* thirdSpecialLineEdit = new QLineEdit();
+    thirdSpecialStacked->addWidget(thirdLabel);
+    thirdSpecialStacked->addWidget(thirdSpecialLineEdit);
+
+    QComboBox* typeEditComboBox = new QComboBox();
+    typeEditComboBox->addItem(QString());
+    typeEditComboBox->addItem("Hero");
+    typeEditComboBox->addItem("Minion");
+    typeEditComboBox->addItem("Spell");
+    typeEditComboBox->addItem("Weapon");
+    typeStacked->addWidget(cardType);
+    typeStacked->addWidget(typeEditComboBox);
+
+    QPushButton* confirmAddButton = new QPushButton("Confirm\nAdd");
+    confirmAddButton->setMinimumSize(dimButton);
+    confirmAddButton->setMaximumSize(dimButton);
+
+    QPushButton* confirmEditButton = new QPushButton("Confirm\nEdit");
+    confirmEditButton->setMinimumSize(dimButton);
+    confirmEditButton->setMaximumSize(dimButton);
+
+    confirmStacked->addWidget(confirmAddButton);
+    confirmStacked->addWidget(confirmEditButton);
+    confirmStacked->setVisible(false);
+
+    QPushButton* cancelButton = new QPushButton("Cancel");
+    cancelButton->setMinimumSize(dimButton);
+    cancelButton->setMaximumSize(dimButton);
+    cancelButton->setVisible(false);
+
+    QFormLayout* cardViewLayout = new QFormLayout();
+    cardViewLayout->setSizeConstraint(QLayout::SetMinimumSize);
+    cardViewLayout->addRow("<b>Name:</b>", nameStacked);
+    cardViewLayout->addRow("<b>Class:</b", classStacked);
+    cardViewLayout->addRow("<b>Cost:</b>", costStacked);
+    cardViewLayout->addRow("<b>Rarity:</b>", rarityStacked);
+    cardViewLayout->addRow("<b>Set:</b>", setStacked);
+    cardViewLayout->addRow("<b>Effect:</b>", textStacked);
+    cardViewLayout->addRow("<b>Flavor:</b>", flavorStacked);
+    cardViewLayout->addRow("<b>Collectible:</b>", collectibleStacked);
+    cardViewLayout->addRow("<b>Artist:</b>", artistStacked);
+    cardViewLayout->addRow("<b>Type:</b>", typeStacked);
+    cardViewLayout->addRow(firstSpecialLabel, firstSpecialStacked);
+    cardViewLayout->addRow(secondSpecialLabel, secondSpecialStacked);
+    cardViewLayout->addRow(thirdSpecialLabel, thirdSpecialStacked);
+    cardViewLayout->addRow(cardID);
+    cardViewLayout->addRow(confirmStacked, cancelButton);
+    cardViewerGroup->setLayout(cardViewLayout);
+
+    setStackedVisible(false, false, false);
+
+    Container<QComboBox*> comboBoxContainer;
+    comboBoxContainer.add(artistComboBox);
+    comboBoxContainer.add(attackComboBox);
+    comboBoxContainer.add(classComboBox);
+    comboBoxContainer.add(collectibleComboBox);
+    comboBoxContainer.add(costComboBox);
+    comboBoxContainer.add(healthComboBox);
+    comboBoxContainer.add(rarityComboBox);
+    comboBoxContainer.add(setComboBox);
+    comboBoxContainer.add(tribeComboBox);
+    comboBoxContainer.add(typeComboBox);
+
+    //whenever a value changes on any QComboBox, it triggers a refresh on the cards list
+    for(auto it = comboBoxContainer.begin(); it != comboBoxContainer.end(); ++it) {
+        connect(*it, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged),
+            [this, persList, persTrovati]{
+            setButton(true, false, false);
+            filtraPers(persList, persTrovati);
+        });
+    }
+
+    //whenever the "Add a Card" button is pressed, the add a card panel appears under the Card Viewer zone
+
+    connect(nuovoPersButton, &QPushButton::clicked, [this, cancelButton, persList, clearButton, confirmAddButton]{
+       cancelButton->setVisible(true);
+       persList->reset();
+       persList->setEnabled(false);
+       clearButton->setEnabled(false);
+       updateViewer("deleted");
+       setButton(false, false, false);
+       confirmStacked->setCurrentIndex(0);
+       typeStacked->setCurrentIndex(1);
+       static_cast<QComboBox*>(typeStacked->widget(1))->setVisible(true);
+       setStackedVisible(false, false, false);
+       confirmAddButton->setEnabled(false);
+       updateStacked();
+    });
+
+    //whenever the "Cancel" button is pressed, undo the current action
+    connect(cancelButton, &QPushButton::clicked, [this, cancelButton, persList, clearButton, confirmAddButton]{
+        updateViewer("deleted");
+        updateStacked();
+        persList->setEnabled(true);
+        persList->reset();
+        clearButton->setEnabled(false);
+        cancelButton->setVisible(false);
+        typeStacked->setCurrentIndex(0);
+        setStackedVisible(false, false, false);
+        setButton(true, false, false);
+    });
+
+    //whenever an element is clicked on the cards list, it triggers a visual refresh on the card view panel
+    connect(persList, &QListWidget::currentRowChanged, [this, persList, clearButton]{
+        setButton(false, true, true);
+        clearButton->setEnabled(true);
+        cardID->setText(persList->currentItem()->data(Qt::UserRole).toString());
+        updateViewer(persList->currentItem()->data(Qt::UserRole).toString());
+    });
+
+    //whenever the Clear Select button is pressed, the current selection is cancelled
+    connect(clearButton, &QPushButton::clicked, [this, persList, clearButton]{
+        setButton(true, false, false);
+        persList->reset();
+        clearButton->setEnabled(false);
+        updateViewer("deleted");
+    });
+
+    //whenever the "Confirm Add" button is pressed, the new item is created, insert into the cards Container and the whole GUI is updated
+    connect(confirmAddButton, &QPushButton::clicked, [this, cancelButton, persList, persTrovati, clearButton, typeEditComboBox]{
+        QString toUse = QString("NEW_000");
+        for(auto it = pers.begin(); it != pers.end(); ++it) {
+            if((*it)->getId().startsWith("NEW_") && toUse.right(3).toInt() <= (*it)->getId().right(3).toInt()) {
+                QString pos = QString::number((*it)->getId().right(3).toInt()+1);
+                unsigned int toSize = toUse.size()-pos.size();
+                toUse = toUse.left(toSize).append(pos);
+            }
+        }
+        cardID->setText(toUse);
+        if(typeEditComboBox->currentText() == "Hero") {
+            pers.add(new Hero(static_cast<QLineEdit*>(artistStacked->widget(1))->text(),
+                               static_cast<QLineEdit*>(classStacked->widget(1))->text(),
+                               static_cast<QComboBox*>(collectibleStacked->widget(1))->currentText(),
+                               static_cast<QSpinBox*>(costStacked->widget(1))->value(),
+                               1,
+                               static_cast<QLineEdit*>(flavorStacked->widget(1))->text(),
+                               toUse,
+                               static_cast<QLineEdit*>(nameStacked->widget(1))->text(),
+                               static_cast<QLineEdit*>(rarityStacked->widget(1))->text(),
+                               static_cast<QLineEdit*>(setStacked->widget(1))->text(),
+                               static_cast<QLineEdit*>(textStacked->widget(1))->text(),
+                               static_cast<QSpinBox*>(firstSpecialStacked->widget(1))->value()
+                          ));
+        }
+        else if(typeEditComboBox->currentText() == "Minion") {
+            pers.add(new Minion(static_cast<QLineEdit*>(artistStacked->widget(1))->text(),
+                                 static_cast<QLineEdit*>(classStacked->widget(1))->text(),
+                                 static_cast<QComboBox*>(collectibleStacked->widget(1))->currentText(),
+                                 static_cast<QSpinBox*>(costStacked->widget(1))->value(),
+                                 1,
+                                 static_cast<QLineEdit*>(flavorStacked->widget(1))->text(),
+                                 toUse,
+                                 static_cast<QLineEdit*>(nameStacked->widget(1))->text(),
+                                 static_cast<QLineEdit*>(rarityStacked->widget(1))->text(),
+                                 static_cast<QLineEdit*>(setStacked->widget(1))->text(),
+                                 static_cast<QLineEdit*>(textStacked->widget(1))->text(),
+                                 static_cast<QSpinBox*>(firstSpecialStacked->widget(1))->value(),
+                                 static_cast<QSpinBox*>(secondSpecialStacked->widget(1))->value(),
+                                 static_cast<QLineEdit*>(thirdSpecialStacked->widget(1))->text()
+                          ));
+        }
+        else if(typeEditComboBox->currentText() == "Spell") {
+            pers.add(new Spell(static_cast<QLineEdit*>(artistStacked->widget(1))->text(),
+                                static_cast<QLineEdit*>(classStacked->widget(1))->text(),
+                                static_cast<QComboBox*>(collectibleStacked->widget(1))->currentText(),
+                                static_cast<QSpinBox*>(costStacked->widget(1))->value(),
+                                1,
+                                static_cast<QLineEdit*>(flavorStacked->widget(1))->text(),
+                                toUse,
+                                static_cast<QLineEdit*>(nameStacked->widget(1))->text(),
+                                static_cast<QLineEdit*>(rarityStacked->widget(1))->text(),
+                                static_cast<QLineEdit*>(setStacked->widget(1))->text(),
+                                static_cast<QLineEdit*>(textStacked->widget(1))->text()
+                          ));
+        }
+        else if(typeEditComboBox->currentText() == "Weapon") {
+            pers.add(new Weapon(static_cast<QLineEdit*>(artistStacked->widget(1))->text(),
+                                 static_cast<QLineEdit*>(classStacked->widget(1))->text(),
+                                 static_cast<QComboBox*>(collectibleStacked->widget(1))->currentText(),
+                                 static_cast<QSpinBox*>(costStacked->widget(1))->value(),
+                                 1,
+                                 static_cast<QLineEdit*>(flavorStacked->widget(1))->text(),
+                                 toUse,
+                                 static_cast<QLineEdit*>(nameStacked->widget(1))->text(),
+                                 static_cast<QLineEdit*>(rarityStacked->widget(1))->text(),
+                                 static_cast<QLineEdit*>(setStacked->widget(1))->text(),
+                                 static_cast<QLineEdit*>(textStacked->widget(1))->text(),
+                                 static_cast<QSpinBox*>(firstSpecialStacked->widget(1))->value(),
+                                 static_cast<QSpinBox*>(secondSpecialStacked->widget(1))->value()
+                          ));
+        }
+        cancelButton->setVisible(false);
+        setButton(true, false, false);
+        clearButton->setEnabled(false);
+        updateComboBox();
+        updateStacked();
+        updateViewer(cardID->text());
+        static_cast<QComboBox*>(typeStacked->widget(1))->setCurrentIndex(0);
+        typeStacked->setCurrentIndex(0);
+        persList->setEnabled(true);
+        filtraPers(persList, persTrovati);
+        resetFilters();
+    });
+
+
+    //whenever the edit confirmation is sent, add the card to the card list and refresh both the left list and the filters
+    connect(confirmEditButton, &QPushButton::clicked, [this, cancelButton, persList, persTrovati, clearButton]{
+        updateCard(persList->currentItem()->data(Qt::UserRole).toString());
+        updateViewer(persList->currentItem()->data(Qt::UserRole).toString());
+        cancelButton->setVisible(false);
+        setButton(true, false, false);
+        clearButton->setEnabled(false);
+        persList->setEnabled(true);
+        updateComboBox();
+        updateStacked();
+        filtraPers(persList, persTrovati);
+        resetFilters();
+    });
+
+    //whenever the Delete a Card button is pressed, the selected Card is removed and the QListWidget updated
+    connect(cancPersButton, &QPushButton::clicked, [this, persList, persTrovati, clearButton]{
+        for(auto it = pers.begin(); it != pers.end(); ++it) {
+            if((*it)->getId() == persList->currentItem()->data(Qt::UserRole).toString()) {
+                pers.erase(pers.search(*it));
+                break;
+            }
+        }
+        updateViewer("deleted");
+        updateComboBox();
+        setButton(true, false, false);
+        clearButton->setEnabled(false);
+        filtraPers(persList, persTrovati);
+        resetFilters();
+    });
+
+    //whenever the Edit a Card button is pressed, the state of every QStackedWidget is changed
+    connect(editCardButton, &QPushButton::clicked, [this, cancelButton, persList]{
+        cancelButton->setVisible(true);
+        setButton(false, false, false);
+        persList->setEnabled(false);
+        confirmStacked->setCurrentIndex(1);
+        updateStacked();
+    });
+
+    //whenever the Save button is pressed, a dialog opens, letting the user to choose a file where to save the current cards to
+    connect(loadButton, &QPushButton::clicked, [this, persList, persTrovati, fileLabel]{
+        QFileDialog dialog(this);
+        dialog.setNameFilter("*.json");
+        QString fileName = dialog.getOpenFileName(this, "Get cards from a file", "", "Json File (*.json)");
+        if(loadFromFile(fileName, persList, persTrovati)) {
+            fileLabel->setText("Loaded successfully");
+        }
+        else {
+            fileLabel->setText("Can't open the file");
+        }
+        updateViewer("deleted");
+        resetFilters();
+        filtraPers(persList, persTrovati);
+    });
+
+    //whenever the reset button is pressed, all the filters are set to "All", resetting the view
+    connect(resetButton, &QPushButton::clicked, [this]{
+        resetFilters();
+    });
+
+    //whenever the Load button is pressed, a dialog opens, letting the user to choose a file where to load the cards from
+    connect(saveButton, &QPushButton::clicked, [this, fileLabel]{
+        QFileDialog dialog(this);
+        dialog.setNameFilter("*.json");
+        QString fileName = dialog.getSaveFileName(this, "Save current cards", "", "Json File (*.json)");
+        if(!fileName.endsWith(".json")) {
+            fileName += ".json";
+        }
+        QFile saveLocation(fileName);
+
+        QJsonArray cardsArray;
+        for(auto it = pers.begin(); it != pers.end(); ++it) {
+            QJsonObject cardSingle;
+            cardSingle.insert("artist", QJsonValue::fromVariant((*it)->getArtist()));
+            cardSingle.insert("cardClass", QJsonValue::fromVariant((*it)->getClassName()));
+            cardSingle.insert("collectible", QJsonValue::fromVariant((*it)->getCollectible()));
+            cardSingle.insert("cost", QJsonValue::fromVariant((*it)->getCost()));
+            cardSingle.insert("dbfId", QJsonValue::fromVariant((*it)->getDbfId()));
+            cardSingle.insert("flavor", QJsonValue::fromVariant((*it)->getFlavor()));
+            cardSingle.insert("id", QJsonValue::fromVariant((*it)->getId()));
+            cardSingle.insert("name", QJsonValue::fromVariant((*it)->getName()));
+            cardSingle.insert("rarity", QJsonValue::fromVariant((*it)->getRarity()));
+            cardSingle.insert("set", QJsonValue::fromVariant((*it)->getSet()));
+            cardSingle.insert("text", QJsonValue::fromVariant((*it)->getText()));
+            if(getType(*it) == "Hero") {
+                cardSingle.insert("type", QJsonValue::fromVariant("Hero"));
+                cardSingle.insert("armor", QJsonValue::fromVariant(static_cast<Hero*>((*it).pointer)->getArmor()));
+            }
+            else if(getType(*it) == "Minion") {
+                Minion* toMinion = static_cast<Minion*>((*it).pointer);
+                cardSingle.insert("type", QJsonValue::fromVariant("Minion"));
+                cardSingle.insert("attack", QJsonValue::fromVariant(toMinion->getAttack()));
+                cardSingle.insert("health", QJsonValue::fromVariant(toMinion->getHealth()));
+                cardSingle.insert("race", QJsonValue::fromVariant(toMinion->getTribe()));
+            }
+            else if(getType(*it) == "Spell") {
+                cardSingle.insert("type", QJsonValue::fromVariant("Spell"));
+            }
+            else {
+                Weapon* toWeapon = static_cast<Weapon*>((*it).pointer);
+                cardSingle.insert("type", QJsonValue::fromVariant("Weapon"));
+                cardSingle.insert("attack", QJsonValue::fromVariant(toWeapon->getAttack()));
+                cardSingle.insert("durability", QJsonValue::fromVariant(toWeapon->getDurability()));
+            }
+            cardsArray.append(cardSingle);
+        }
+
+        QJsonObject toInsert;
+        toInsert.insert("pers", cardsArray);
+        QJsonDocument doc(toInsert);
+        if(!saveLocation.open(QIODevice::WriteOnly)) {
+            fileLabel->setText("Can't open the file");
+            return;
+        }
+        saveLocation.write(doc.toJson());
+        fileLabel->setText("Saved successfully");
+    });
+
+    //whenever the value on the text field changes, it triggers a refresh on the cards list
+    connect(textBox, &QLineEdit::textChanged, [this, persList, persTrovati]{
+        setButton(true, false, false);
+        filtraPers(persList, persTrovati);
+    });
+
+    //whenever the type combobox value on Add a Card changes, show different input fields based on the type
+    connect(typeEditComboBox, static_cast<void (QComboBox::*)(int index)>(&QComboBox::currentIndexChanged),
+        [this, confirmAddButton, typeEditComboBox] {
+            if(typeEditComboBox->currentText() == "Hero") {
+                firstSpecialLabel->setText("<b>Armor:</b>");
+                setStackedVisible(true, false, false);
+                confirmAddButton->setEnabled(true);
+            }
+            else if(typeEditComboBox->currentText() == "Minion") {
+                firstSpecialLabel->setText("<b>Attack:</b>");
+                secondSpecialLabel->setText("<b>Health:</b>");
+                thirdSpecialLabel->setText("<b>Tribe:</b>");
+                setStackedVisible(true, true, true);
+                confirmAddButton->setEnabled(true);
+            }
+            else if(typeEditComboBox->currentText() == "Spell") {
+                setStackedVisible(false, false, false);
+                confirmAddButton->setEnabled(true);
+            }
+            else if(typeEditComboBox->currentText() == "Weapon") {
+                firstSpecialLabel->setText("<b>Attack:</b>");
+                secondSpecialLabel->setText("<b>Durability:</b>");
+                setStackedVisible(true, true, false);
+                confirmAddButton->setEnabled(true);
+            }
+            else {
+                confirmAddButton->setEnabled(false);
+                setStackedVisible(false, false, false);
+            }
+    });
+
+    QGridLayout* grid = new QGridLayout();
+    grid->addWidget(persGroup, 0, 0);
+    grid->addWidget(operationsGroup, 0, 1);
+    grid->addWidget(cardViewerGroup, 0, 2);
+    setLayout(grid);
+    setWindowTitle("Qontainer");
+}
